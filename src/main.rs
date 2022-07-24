@@ -1,66 +1,20 @@
 use std::process;
 use std::io::{self, BufRead, Write};
-use fork::{fork, Fork};
-use std::ffi::CString;
-use nix::unistd::execvp;
-use termination::{EXIT_FAILURE, EXIT_SUCCESS};
 use sysinfo::SystemExt;
 use sysinfo::ProcessExt;
+use std::process::Command;
 
-fn moonsh_launch(command: &str, args: Vec<&str>) -> i32 {
-    let mut system = sysinfo::System::new();
-    // Fork to a child process and run the given command with args
-    //  TODO maybe this needs rewritten with sysinfo ProcessExt and other sysinfo utils instead of
-    //  fork
-    match fork() {
-        Ok(Fork::Parent(child)) => {
-            // loop and while child process with id 'child' has not exited, continue to loop
-            loop {
-                system.refresh_all();
-                match system.get_process(child) {
-                    Some(proc) => {
-                        match &proc.status {
-                            Some(stat) => {
-                                match stat {
-                                    sysinfo::ProcessStatus::Zombie | sysinfo::ProcessStatus::Dead => {
-                                        proc.kill(sysinfo::Signal::Kill);
-                                        break EXIT_FAILURE;
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            None => {
-                                // Should we panic! ?
-                                break EXIT_FAILURE;
-                            }
-                        }
-                    } // continue
-                    None => {
-                        break EXIT_FAILURE;
-                    }
-                }
-            }
-        }
-        Ok(Fork::Child) => {
-            // This conversion can probably be more robust
-            let c_command: CString = CString::new(command).expect("Could not convert command string to CString.");
-            let c_args: Vec<CString> = args.iter().map(|arg| CString::new(arg.to_owned()).expect("Could not convert an arg.")).collect();
-            
-            match execvp(&c_command, c_args.as_slice()) {
-                Err(e) => {
-                    println!("{}: {}", command, e);
-                    process::exit(EXIT_FAILURE)
-                }
-                _ => {
-                    process::exit(EXIT_FAILURE)
-                }
-            }
-        }
-        Err(_) => {
-            println!("Could not fork.");
-            EXIT_SUCCESS
+fn moonsh_launch(command: &str, args: Vec<&str>) -> Result<i32, String> {
+    // Filter for ^D and give exit_failure
+    // Treat ^C like bash does
+    // Handle help, cd, and exit / logout gracefully
+    match Command::new(command).args(args).status() {
+        Ok(_) => {}
+        Err(e) => {
+            println!("{}: {}", command, e);
         }
     }
+    Ok(0)
 }
 
 fn moonsh_read_line() -> io::Result<String> {
@@ -74,8 +28,6 @@ fn moonsh_read_line() -> io::Result<String> {
 }
 
 fn moonsh_loop(prompt: &str) -> i32 {
-    let mut status: i32;
-    
     loop {
         print!("{}", prompt);
         io::stdout().flush().expect("Could not flush stdout.");
@@ -86,7 +38,7 @@ fn moonsh_loop(prompt: &str) -> i32 {
             Ok(l) => line = l,
             Err(e) => {
                 println!("Error reading line from stdin: {}", e);
-                return 1;
+                break 1
             }
         }
 
@@ -96,10 +48,12 @@ fn moonsh_loop(prompt: &str) -> i32 {
         // Trim leading and trailing whitespace
         args = args.iter().map(|arg| arg.trim()).collect();
 
-        status = moonsh_launch(args[0], args);
-
-        if status == 0 {
-            break EXIT_SUCCESS;
+        match moonsh_launch(args[0], args[1..].to_vec()) {
+            Ok(_) => {} // Nothing to see here
+            Err(e) => { // Exiting gracefully
+                println!("{}", e);
+                break 0
+            }
         }
     }
 }
@@ -116,11 +70,3 @@ fn main() {
 
     process::exit(code)
 }
-
-// Status:
-// Basic REPL working with stubbed execution functions
-// Will need to read up on std::unix::execvp or other methods
-// Need to find programs in path variable (use your own approach if needed)
-//
-// copying execvp crate code for executing commands, need to know how perror works -> follow shell
-// tutorial
