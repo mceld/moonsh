@@ -1,44 +1,64 @@
 use std::process;
-use errno::{Errno, Error};
 use std::io::{self, BufRead, Write};
 use fork::{fork, Fork};
-use std::env;
-use std::ptr;
-use libc::execvp;
+use std::ffi::CString;
+use nix::unistd::execvp;
+use termination::{EXIT_FAILURE, EXIT_SUCCESS};
+use sysinfo::SystemExt;
+use sysinfo::ProcessExt;
 
-fn c_exec(command: &str, args: Vec<&str>) {
-    let mut res;
-    let mut args_ptr: Vec<*const u8> = args.iter().map(|s| s.as_ptr()).collect();
-    args_ptr.push(ptr::null());
-
-    unsafe {
-        res = execvp(command.as_ptr(), args_ptr.as_ptr());
-    };
-
-    Err(Error::Sys(Errno::last()))
-}
-
-fn moonsh_launch(args: Vec<&str>) -> i32 {
-    let mut child;
-    let mut wpid;
-    let mut status;
-
+fn moonsh_launch(command: &str, args: Vec<&str>) -> i32 {
+    let mut system = sysinfo::System::new();
+    // Fork to a child process and run the given command with args
+    //  TODO maybe this needs rewritten with sysinfo ProcessExt and other sysinfo utils instead of
+    //  fork
     match fork() {
         Ok(Fork::Parent(child)) => {
-            println!("Parent executing, new child has id: {}", child);
+            // loop and while child process with id 'child' has not exited, continue to loop
             loop {
-                //let wpid = waitpid(child, status.as_ptr(), WUNTRACED);
-                break;
+                system.refresh_all();
+                match system.get_process(child) {
+                    Some(proc) => {
+                        match &proc.status {
+                            Some(stat) => {
+                                match stat {
+                                    sysinfo::ProcessStatus::Zombie | sysinfo::ProcessStatus::Dead => {
+                                        proc.kill(sysinfo::Signal::Kill);
+                                        break EXIT_FAILURE;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            None => {
+                                // Should we panic! ?
+                                break EXIT_FAILURE;
+                            }
+                        }
+                    } // continue
+                    None => {
+                        break EXIT_FAILURE;
+                    }
+                }
             }
         }
-
         Ok(Fork::Child) => {
-            println!("Forked to child");
-            c_exec(args[0], args[1..])
+            // This conversion can probably be more robust
+            let c_command: CString = CString::new(command).expect("Could not convert command string to CString.");
+            let c_args: Vec<CString> = args.iter().map(|arg| CString::new(arg.to_owned()).expect("Could not convert an arg.")).collect();
+            
+            match execvp(&c_command, c_args.as_slice()) {
+                Err(e) => {
+                    println!("{}: {}", command, e);
+                    process::exit(EXIT_FAILURE)
+                }
+                _ => {
+                    process::exit(EXIT_FAILURE)
+                }
+            }
         }
-
         Err(_) => {
-            println!("Failed to fork to child process.");
+            println!("Could not fork.");
+            EXIT_SUCCESS
         }
     }
 }
@@ -70,13 +90,16 @@ fn moonsh_loop(prompt: &str) -> i32 {
             }
         }
 
-        // Parse command into args for syscall
-        let args: Vec<&str> = line.split(' ').collect();
+        // Parse command into args for sys call
+        let mut args: Vec<&str> = line.split(' ').collect();
 
-        status = moonsh_launch(args);
-        
+        // Trim leading and trailing whitespace
+        args = args.iter().map(|arg| arg.trim()).collect();
+
+        status = moonsh_launch(args[0], args);
+
         if status == 0 {
-            break 0;
+            break EXIT_SUCCESS;
         }
     }
 }
