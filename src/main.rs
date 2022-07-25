@@ -1,17 +1,40 @@
 use std::process;
 use std::io::{self, BufRead, Write};
-use sysinfo::SystemExt;
-use sysinfo::ProcessExt;
+//use sysinfo::SystemExt;
+//use sysinfo::ProcessExt;
 use std::process::Command;
+mod builtins;
 
-fn moonsh_launch(command: &str, args: Vec<&str>) -> Result<i32, String> {
+fn moonsh_launch(command: &str, args: Vec<&str>) -> Result<i32, &'static str> {
     // Filter for ^D and give exit_failure
     // Treat ^C like bash does
     // Handle help, cd, and exit / logout gracefully
-    match Command::new(command).args(args).status() {
-        Ok(_) => {}
-        Err(e) => {
-            println!("{}: {}", command, e);
+
+    if builtins::is_builtin(command) {
+        match builtins::execute_builtin(command, args) {
+            Ok(status) => {
+                return Ok(status);
+            }
+            Err(e) => {
+                match e {
+                    "exit" => {
+                        return Err(e);
+                    }
+                    _ => {
+                        println!("{}", e);
+                        return Ok(0);
+                    }
+                }
+            }
+        }
+    }
+
+    else {
+        match Command::new(command).args(args).status() {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{}: {}", command, e);
+            }
         }
     }
     Ok(0)
@@ -61,7 +84,7 @@ fn moonsh_loop(prompt: &str) -> i32 {
 
 fn main() {
     // config
-    let prompt: &str = "moonsh$ ";
+    let prompt: &str = "> ";
     
     // loop
     let code: i32 = moonsh_loop(prompt);
