@@ -25,7 +25,7 @@ pub fn is_builtin(name: &str) -> bool {
 pub fn execute_builtin(command: &str, args: Vec<&str>) -> Result<i32, &'static str>  {
     match command {
         "cd" => {
-            return cd(args[0]);
+            return cd(args);
         }
         "help" => {
             return help();
@@ -40,14 +40,17 @@ pub fn execute_builtin(command: &str, args: Vec<&str>) -> Result<i32, &'static s
     }
 }
 
-fn cd(dir: &str) -> Result<i32, &'static str> {
+fn cd(args: Vec<&str>) -> Result<i32, &'static str> {
+    if args.len() == 0 {
+        return Err("Expected an argument to cd");
+    }
+
+    let dir: &str = args[0];
     if dir.is_empty() {
-        println!("Expected an argument to cd");
-        return Ok(0);
+        return Err("Expected an argument to cd");
     }
 
     let new_dir: &Path = Path::new(dir);
-
     match env::set_current_dir(&new_dir) {
         Ok(_) => { return Ok(0); }
         Err(_) => { return Err("No such directory"); }
