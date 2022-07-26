@@ -48,8 +48,10 @@ fn cd(dir: &str) -> Result<i32, &'static str> {
 
     let new_dir: &Path = Path::new(dir);
 
-    assert!(env::set_current_dir(&new_dir).is_ok());
-    return Ok(0);
+    match env::set_current_dir(&new_dir) {
+        Ok(_) => { return Ok(0); }
+        Err(_) => { return Err("No such directory"); }
+    }
 }
 
 fn help() -> Result<i32, &'static str> {
