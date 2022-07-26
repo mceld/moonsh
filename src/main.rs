@@ -2,7 +2,6 @@ use std::process;
 use std::io::{self, BufRead, Write};
 //use sysinfo::SystemExt;
 //use sysinfo::ProcessExt;
-use std::process::Command;
 mod builtins;
 
 fn moonsh_launch(command: &str, args: Vec<&str>) -> Result<i32, &'static str> {
@@ -30,7 +29,7 @@ fn moonsh_launch(command: &str, args: Vec<&str>) -> Result<i32, &'static str> {
     }
 
     else {
-        match Command::new(command).args(args).status() {
+        match process::Command::new(command).args(args).status() {
             Ok(_) => {}
             Err(e) => {
                 println!("{}: {}", command, e);
