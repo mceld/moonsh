@@ -70,6 +70,7 @@ fn moonsh_loop(prompt: &str) -> i32 {
         
         // Interpret moonsh wildcards and other control constructs
         // Overwrite args, form a list? and pass to moonsh_launch?
+        // Handle wildcards / groups first
 
         match moonsh_launch(args[0], args[1..].to_vec()) {
             Ok(_) => {} // Nothing to see here
