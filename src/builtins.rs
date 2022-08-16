@@ -1,14 +1,3 @@
-//use lazy_static::lazy_static;
-//use std::collections::HashMap;
-//
-//lazy_static! {
-//    static ref BUILTINS: HashMap<&'static str, fn> = HashMap::from([
-//        ("cd", cd)
-//        , ("help", help)
-//        , ("exit", exit)
-//    ]);
-//}
-
 use std::env;
 use std::path::Path;
 

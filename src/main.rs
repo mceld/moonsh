@@ -1,7 +1,5 @@
 use std::process;
 use std::io::{self, BufRead, Write};
-//use sysinfo::SystemExt;
-//use sysinfo::ProcessExt;
 mod builtins;
 
 fn moonsh_launch(command: &str, args: Vec<&str>) -> Result<i32, &'static str> {
@@ -69,6 +67,9 @@ fn moonsh_loop(prompt: &str) -> i32 {
 
         // Trim leading and trailing whitespace
         args = args.iter().map(|arg| arg.trim()).collect();
+        
+        // Interpret moonsh wildcards and other control constructs
+        // Overwrite args, form a list? and pass to moonsh_launch?
 
         match moonsh_launch(args[0], args[1..].to_vec()) {
             Ok(_) => {} // Nothing to see here
