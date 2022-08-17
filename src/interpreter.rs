@@ -1,104 +1,181 @@
-use std::format;
-use std::fs;
-
-const TM = &[
-    // normal
-    [
-        token_kind::normal,
-        token_kind::kleene,
-        token_kind::single,
-        token_kind::group_start,
-        parse_error::no_group_start,
-    ],
-    // kleene
-    [
-        token_kind::normal,
-        token_kind::kleene,
-        token_kind::kleene,
-        token_kind::group_start,
-        parse_error::no_group_start,
-    ],
-    // single
-    [
-        token_kind::normal,
-        token_kind::kleene,
-        token_kind::single,
-        token_kind::group_start,
-        parse_error::no_group_start,
-    ],
-    // group_start
-    [
-        token_kind::group_start,
-        token_kind::group_start,
-        token_kind::group_start,
-        parse_error::no_group_nest,
-        token_kind::group_end,
-    ],
-    // group_end
-    [
-        token_kind::normal,
-        token_kind::kleene,
-        token_kind::single,
-        token_kind::group_start,
-        parse_error::no_group_start,
-    ],
-];
-
-const ERR_MSGS = &[
-    "No start to group ended with \"]\".", // no_group_start
-    "Cannot nest groups defined by brackets.", // no_group_nest
-];
-
-enum token_kind {
-    normal,
-    kleene, // *
-    single, // ?
-    group_start, // [
-    group_end, // ]
-    //pipe, // |
-}
-
-enum parse_error {
-    no_group_start,
-    no_group_nest
-}
-
-struct token {
-    kind: token_kind
-    value: char
-}
-
 /**
- * '*' matches any number of normal characters between starting and ending normal characters in
- * an expression.  Reading a Kleene operator will override other wildcards and simply match all,
- * not transitioning state until a normal character is read.
- * '?' matches any single character between start and end normal characters
- * '[...]' matches any single character from the characters listed between square brackets and
- * interprets them literally (wildcards '?' and '*' are read as their ASCII equivalents)
-*/
-fn get_kind(ch: char) -> token_kind {
-    match ch {
-        "*" => token_kind::kleene
-        "?" => token_kind::single
-        "[" => token_kind::group_start
-        "]" => token_kind::group_end
-        _ => token_kind::normal
+ * Transition matrix defines tokenization scheme
+ *
+ * States and their numbers:
+ * 0: Normal
+ * 1: Kleene
+ * 2: Single
+ * 3: GroupStart
+ * 4: GroupEnd
+ * 5: Group
+ * E: ParseError (of some kind)
+ *
+ * Character types (correspond to enum values):
+ * a: normal (any character other than defined wildcards)
+ * *: kleene star (regex '.*')
+ * ?: single character (regex '.')
+ * [: opening square bracket
+ * ]: closing square bracket
+ *
+ * Unclosed group error (i.e. [, [abc) handled by 'parse_arg'
+ *
+ *   a * ? [ ]
+ * 0 0 1 2 3 E
+ * 1 0 1 2 3 E
+ * 2 0 1 2 3 E
+ * 3 5 5 5 E 4
+ * 4 0 1 2 3 E
+ * 5 5 5 5 5 4
+ *
+ */
+const TM: [[Result<TokenKind, ParseError>; 5]; 6] = [
+    /* Outer lists are states, inner lists are character types given by get_kind */
+    // Normal
+    [
+        Ok(TokenKind::Normal),
+        Ok(TokenKind::Kleene),
+        Ok(TokenKind::Single),
+        Ok(TokenKind::GroupStart),
+        Err(ParseError::NoGroupStart),
+    ],
+    // Kleene
+    [
+        Ok(TokenKind::Normal),
+        Ok(TokenKind::Kleene),
+        Ok(TokenKind::Single),
+        Ok(TokenKind::GroupStart),
+        Err(ParseError::NoGroupStart),
+    ],
+    // Single
+    [
+        Ok(TokenKind::Normal),
+        Ok(TokenKind::Kleene),
+        Ok(TokenKind::Single),
+        Ok(TokenKind::GroupStart),
+        Err(ParseError::NoGroupStart),
+    ],
+    // GroupStart
+    [
+        Ok(TokenKind::Group),
+        Ok(TokenKind::Group),
+        Ok(TokenKind::Group),
+        Err(ParseError::NoGroupNest),
+        Ok(TokenKind::GroupEnd),
+    ],
+    // GroupEnd
+    [
+        Ok(TokenKind::Normal),
+        Ok(TokenKind::Kleene),
+        Ok(TokenKind::Single),
+        Ok(TokenKind::GroupStart),
+        Err(ParseError::NoGroupStart),
+    ],
+    // Group
+    [
+        Ok(TokenKind::Group),
+        Ok(TokenKind::Group),
+        Ok(TokenKind::Group),
+        Ok(TokenKind::Group),
+        Ok(TokenKind::GroupEnd),
+    ],
+];
+
+const ERR_MSGS: [&'static str; 3] = [
+    "No start to group ended with \"]\".", // NoGroupStart
+    "Cannot nest groups.", // NoGroupNest
+    "Group has no matching \"]\".", // GroupNotEnded
+];
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+enum TokenKind {
+    Normal,
+    Kleene, // *
+    Single, // ?
+    GroupStart, // [
+    GroupEnd, // ]
+    Group,
+    // Pipe, // |
+}
+
+#[derive(Copy, Clone)]
+enum ParseError {
+    NoGroupStart,
+    NoGroupNest,
+    GroupNotEnded,
+}
+
+#[derive(Debug)]
+pub struct Token {
+    kind: TokenKind,
+    value: String,
+}
+
+impl ToString for Token {
+    fn to_string(&self) -> String {
+        self.value.to_string()
     }
 }
 
-fn eat(ch: char) -> token {
-    token { get_kind(ch), ch }
+fn get_kind(ch: char) -> TokenKind {
+    match ch {
+        '*' => { TokenKind::Kleene }
+        '?' => { TokenKind::Single }
+        '[' => { TokenKind::GroupStart }
+        ']' => { TokenKind::GroupEnd }
+        _ => { TokenKind::Normal }
+    }
 }
-    
-//fn parse_arg(arg: &str) -> token {
-//    let curr: token_kind = token_kind::normal; 
-//
-//    for ch in arg.chars() {
-//        let next: token = eat(ch);
-//
-//    }
-//}
 
-fn error(token: &str) {
-    format!("Incorrect use of token: {}", token);
+pub fn parse_arg(arg: &str) -> Result<Vec<Token>, &'static str> {
+    let mut tokens: Vec<Token> = Vec::<Token>::new();
+    let mut token_buf: String = String::new();
+    let mut curr: TokenKind = TokenKind::Normal;
+    let length: usize = arg.len();
+    let arg_vec: Vec<char> = arg.chars().collect();
+
+    for ch in 0..length {
+        let next: TokenKind = get_kind(arg_vec[ch]);
+        let transition = &TM[curr as usize][next as usize]; // Transition based on current and next
+
+        match transition {
+            Err(err) => {
+                return Err(ERR_MSGS[*err as usize]);
+            }
+            Ok(val) => {
+                // If the token type is changing
+                if curr != *val {
+                    // Create a token with the current token type and buffer and add it to 'tokens'
+                    tokens.push(Token { kind: curr, value: token_buf.clone() });
+                    token_buf = "".to_string(); // Reset the buffer
+                    curr = *val;
+                }
+                // Add to continue the previous token or start a new one
+                token_buf.push(arg_vec[ch]);
+            }
+        }
+        
+        // If ending on a Group state - return an Error
+        if ch == (length - 1) {
+            match transition {
+                Ok(val) => {
+                    match val {
+                        TokenKind::GroupStart | TokenKind::Group => {
+                            return Err(ERR_MSGS[ParseError::GroupNotEnded as usize]);
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {} // Errors should be filtered by the match above
+            }
+        }
+    }
+
+    tokens.push(Token { kind: curr, value: token_buf.clone() });
+
+    Ok(tokens)
 }
+
+// TODO 
+// Filter out commands that contain wildcards in caller
+// Construct regex for token vectors
+// Provide list of possible arguments and execute each as separate command

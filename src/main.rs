@@ -1,6 +1,7 @@
 use std::process;
 use std::io::{self, BufRead, Write};
 mod builtins;
+mod interpreter;
 
 fn moonsh_launch(command: &str, args: Vec<&str>) -> Result<i32, &'static str> {
     // Filter for ^D and give exit_failure
@@ -71,6 +72,16 @@ fn moonsh_loop(prompt: &str) -> i32 {
         // Interpret moonsh wildcards and other control constructs
         // Overwrite args, form a list? and pass to moonsh_launch?
         // Handle wildcards / groups first
+        for arg in &args {
+            match interpreter::parse_arg(arg) {
+                Ok(tokens) => {
+                    println!("{:?}", tokens);
+                }
+                Err(e) => {
+                    println!("{}", e);
+                }
+            }
+        }
 
         match moonsh_launch(args[0], args[1..].to_vec()) {
             Ok(_) => {} // Nothing to see here
