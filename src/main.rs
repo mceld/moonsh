@@ -1,5 +1,6 @@
 use std::process;
 use std::io::{self, BufRead, Write};
+use crate::interpreter::Token;
 mod builtins;
 mod interpreter;
 
@@ -70,18 +71,22 @@ fn moonsh_loop(prompt: &str) -> i32 {
         args = args.iter().map(|arg| arg.trim()).collect();
         
         // Interpret moonsh wildcards and other control constructs
-        // Overwrite args, form a list? and pass to moonsh_launch?
-        // Handle wildcards / groups first
-        for arg in &args {
+        // in all but the first element of args
+        let mut arg_tokens: Vec<Vec<Token>> = Vec::new();
+        for arg in &args[1..] {
             match interpreter::parse_arg(arg) {
                 Ok(tokens) => {
-                    println!("{:?}", tokens);
+                    arg_tokens.push(tokens);
                 }
                 Err(e) => {
                     println!("{}", e);
                 }
             }
         }
+
+        // Build regex from tokens and then the following kind of structure:
+        // (command) [all regex matches in fs] [all regex matches in fs]
+        // execute all permutations individually
 
         match moonsh_launch(args[0], args[1..].to_vec()) {
             Ok(_) => {} // Nothing to see here
