@@ -50,7 +50,7 @@ Ctrl-Right moves forward in the list of slice (with wrap-around)
 
 `pop <n>` - pop `n` directories from the current slice's stack
 
-    - `pop a` will remove everything but the very bottom directory.
+- `pop a` will remove everything but the very bottom directory.
 
 `pop`ping to an empty stack will fill in the bottom of the stack with the directory specified by `$HOME`.
 
