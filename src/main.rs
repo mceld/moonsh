@@ -74,6 +74,13 @@ fn moonsh_loop(prompt: &str) -> i32 {
         // in all but the first element of args
         let mut arg_tokens: Vec<Vec<Token>> = Vec::new();
         for arg in &args[1..] {
+
+            // Don't tokenize options TODO: but keep them in the final arg list
+            match arg.chars().nth(0) {
+                Some('-') => { continue; }
+                _ => {}
+            }
+
             match interpreter::parse_arg(arg) {
                 Ok(tokens) => {
                     arg_tokens.push(tokens);
@@ -84,9 +91,13 @@ fn moonsh_loop(prompt: &str) -> i32 {
             }
         }
 
+        println!("{:?}", arg_tokens);
+
         // Build regex from tokens and then the following kind of structure:
         // (command) [all regex matches in fs] [all regex matches in fs]
         // execute all permutations individually
+//        let combos: Vec<Vec<&str>> = interpreter::build_combinations(arg_tokens);
+        interpreter::build_combinations(arg_tokens);
 
         match moonsh_launch(args[0], args[1..].to_vec()) {
             Ok(_) => {} // Nothing to see here
