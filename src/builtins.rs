@@ -47,23 +47,24 @@ fn cd(args: Vec<&str>) -> Result<i32, &'static str> {
 }
 
 fn help() -> Result<i32, &'static str> {
-    Err("moonsh\
-        \
-        Builtins:\
-        cd <dest>\
-        exit\
-        help\
-        slice [dir]\
-            Define a new slice with 'dir' as the first directory in the stack.
-            'dir' is optional and will use $HOME as a default
-        slices\
-            Display currently allocated slices graphically.
-        pop <n>\
-            Pop n directories from the current slice's stack.\
-            'pop a' will remove all directories on the stack and fill the stack with the directory at $HOME\
-        reload <config_file>\
-            Tear down all current slices and read the given config file as a sequence of moonsh commands.\
-    ")
+    Err(
+"moonsh
+
+Builtins:
+cd <dest>
+exit
+help
+slice [dir]
+    Define a new slice with 'dir' as the first directory in the stack.
+    'dir' is optional and will use $HOME as a default.
+slices
+    Display currently allocated slices graphically.
+pop <n>
+    Pop n directories from the current slice's stack.
+    'pop a' will remove all directories on the stack and fill the stack with the directory at $HOME.
+reload <config_file>
+    Tear down all current slices and read the given config file as a sequence of moonsh commands."
+    )
 }
 
 fn exit() -> Result<i32, &'static str> {
