@@ -12,13 +12,13 @@ Add `moonsh` executable path to `/etc/shells` and `chsh` on Linux if you are bra
 
 Allocate some number of slices (limit?) that each contain a stack of directories (built up as the user interacts with the shell).
 
-'cd /somewhere/far/away/' will place this on the stack above the initial directory in that slice.
+`cd /somewhere/far/away/` will place this on the stack above the initial directory in that slice.
 
 #### Config file format
 
 ```
-slice '/path/to/place/'
-slice '...'
+slice /path/to/place/
+slice ...
 ...
 ```
 
