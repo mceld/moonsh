@@ -95,12 +95,12 @@ fn moonsh_loop(prompt: &str) -> i32 {
             }
         }
 
-        println!("{:?}", arg_tokens);
+        //println!("{:?}", arg_tokens);
 
         // Build regex from tokens
         let re_vec: Vec<String> = interpreter::build_regex(arg_tokens);
 
-        println!("{:?}", re_vec);
+        //println!("{:?}", re_vec);
 
         // Enumerate combinations with regex-matching paths/files
         // Add combinations to common args in a list of lists
