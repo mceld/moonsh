@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use regex::Regex;
+use std::path::Path;
 
 /**
  * Transition matrix defines tokenization scheme
@@ -177,50 +179,69 @@ pub fn parse_arg(arg: &str) -> Result<Vec<Token>, &'static str> {
     Ok(tokens)
 }
 
-pub fn build_combinations(token_lists: Vec<Vec<Token>>) -> () {//-> Vec<Vec<&'static str>> {
-    let mut combos: Vec<Vec<&str>> = Vec::new();
+pub fn build_regex(token_lists: Vec<Vec<Token>>) -> Vec<String> {
+    let mut re_vec: Vec<String> = Vec::new();
+
     // list of list of tokens
     for list in token_lists {
+
         // build a regex out of the list of tokens
         let mut re: String = String::new();
+
         for tok in list {
+
             match tok.kind {
+
                 TokenKind::Normal => {
                     re.push_str(&tok.value);
                 }
+
                 TokenKind::Kleene => {
                     re.push_str(".*");
                 }
+
                 TokenKind::Single => {
                     re.push_str(".");
                 }
-                TokenKind::Group => {
-                    let charvec: Vec<char> = tok.value.chars().collect();
-                    let mut charset: HashSet<char> = HashSet::new();
 
-                    for item in charvec {
-                        charset.insert(item);
+                TokenKind::Group => {
+                    let char_vec: Vec<char> = tok.value.chars().collect();
+                    let mut char_set: HashSet<char> = HashSet::new();
+
+                    for item in char_vec {
+                        char_set.insert(item);
                     }
 
-                    let setcap: usize = charset.len();
-                    let mut i: usize = 0;
+                    let set_size: usize = char_set.len();
+                    let mut iter: usize = 0;
 
                     re.push_str("(");
-                    for ch in charset {
-                        i += 1;
+                    for ch in char_set {
+                        iter += 1;
                         re.push(ch); // push a char
-                        if i != setcap {
+                        if iter != set_size {
                             re.push_str("|");
                         }
                     }
                     re.push_str(")");
                 }
+
                 _ => {} // GroupStart + GroupEnd can be skipped
             }
         }
-        println!("{}", re);
+        re_vec.push(re);
     }
+    re_vec
 }
+
+//fn match_combos(re_str: &str) -> Vec<&str> {
+//    let re: Regex = Regex::new(re_str).unwrap();
+//
+//    // List all files that match regex ? how should this be done?
+//    // Should the tokenizer split up path tokens and add them to the path that should be listed and
+//    // searched for regex matches?
+//
+//}
 
 // TODO 
 // Filter out commands that contain wildcards in caller

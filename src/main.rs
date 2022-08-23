@@ -70,14 +70,18 @@ fn moonsh_loop(prompt: &str) -> i32 {
         // Trim leading and trailing whitespace
         args = args.iter().map(|arg| arg.trim()).collect();
         
-        // Interpret moonsh wildcards and other control constructs
+        // Interpret moonsh wildcards and other control constructs (TODO: semicolons...)
         // in all but the first element of args
         let mut arg_tokens: Vec<Vec<Token>> = Vec::new();
+        let mut common_args: Vec<&str> = Vec::new();
+
+        common_args.push(args[0]); // Common args are those that do not need tokenized
+
         for arg in &args[1..] {
 
-            // Don't tokenize options TODO: but keep them in the final arg list
+            // Don't tokenize options
             match arg.chars().nth(0) {
-                Some('-') => { continue; }
+                Some('-') => { common_args.push(arg); }
                 _ => {}
             }
 
@@ -93,11 +97,15 @@ fn moonsh_loop(prompt: &str) -> i32 {
 
         println!("{:?}", arg_tokens);
 
-        // Build regex from tokens and then the following kind of structure:
+        // Build regex from tokens
+        let re_vec: Vec<String> = interpreter::build_regex(arg_tokens);
+
+        println!("{:?}", re_vec);
+
+        // Enumerate combinations with regex-matching paths/files
+        // Add combinations to common args in a list of lists
         // (command) [all regex matches in fs] [all regex matches in fs]
-        // execute all permutations individually
-//        let combos: Vec<Vec<&str>> = interpreter::build_combinations(arg_tokens);
-        interpreter::build_combinations(arg_tokens);
+        // iterate over this list running moonsh_launch for each entry
 
         match moonsh_launch(args[0], args[1..].to_vec()) {
             Ok(_) => {} // Nothing to see here
@@ -112,6 +120,7 @@ fn moonsh_loop(prompt: &str) -> i32 {
 
 fn main() {
     // config
+    // Just needs basic pwd text (with limit?)
     let prompt: &str = "> ";
     
     // loop
