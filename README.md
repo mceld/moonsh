@@ -10,7 +10,7 @@ Add `moonsh` executable path to `/etc/shells` and `chsh` on Linux if you are bra
 
 ### Config
 
-Allocate some number of slices (limit?) that each contain a stack of directories (built up as the user interacts with the shell).
+Allocate some number of slices that each contain a stack of directories (built up as the user interacts with the shell).
 
 `cd /somewhere/far/away/` will place this on the stack above the initial directory in that slice.
 
@@ -24,7 +24,7 @@ slice ...
 
 `slice` alone is also acceptable and will default to the `$HOME` environment variable.
 
-`Note to self: Just run the configuration file line by line in the regular shell when running 'reload' (blow away current slices first however)`
+The config file will be run as a sequence of commands to `moonsh`, you can provide commands other than `slice`.
 
 ### Interaction
 
