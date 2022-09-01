@@ -65,3 +65,5 @@ Accepted wildcards
 ```
 
 Other characters are considered `Normal`.
+
+web
