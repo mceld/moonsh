@@ -49,7 +49,7 @@ fn moonsh_read_line() -> io::Result<String> {
     Ok(buf)
 }
 
-fn moonsh_loop(prompt: &str) -> i32 {
+fn moonsh_loop(prompt: &str) -> Result<i32, String> {
     loop {
         print!("{}", prompt);
         io::stdout().flush().expect("Could not flush stdout.");
@@ -59,8 +59,7 @@ fn moonsh_loop(prompt: &str) -> i32 {
         match moonsh_read_line() {
             Ok(l) => line = l,
             Err(e) => {
-                println!("Error reading line from stdin: {}", e);
-                break 1
+                break Err(e.to_string());
             }
         }
 
@@ -81,7 +80,10 @@ fn moonsh_loop(prompt: &str) -> i32 {
 
             // Don't tokenize options
             match arg.chars().nth(0) {
-                Some('-') => { common_args.push(arg); }
+                Some('-') => {
+                    common_args.push(arg);
+                    continue;
+                }
                 _ => {}
             }
 
@@ -95,8 +97,6 @@ fn moonsh_loop(prompt: &str) -> i32 {
             }
         }
 
-        //println!("{:?}", arg_tokens);
-
         // Build regex from tokens
         let re_vec: Vec<String> = interpreter::build_regex(arg_tokens);
 
@@ -106,12 +106,46 @@ fn moonsh_loop(prompt: &str) -> i32 {
         // Add combinations to common args in a list of lists
         // (command) [all regex matches in fs] [all regex matches in fs]
         // iterate over this list running moonsh_launch for each entry
+        //
+        let paths: Vec<Vec<String>>; 
 
-        match moonsh_launch(args[0], args[1..].to_vec()) {
-            Ok(_) => {} // Nothing to see here
-            Err(e) => { // Exiting gracefully
+        match interpreter::valid_paths(re_vec) {
+            Err(e) => {
                 println!("{}", e);
-                break 0
+                continue;
+            }
+            Ok(p) => {
+                paths = p;
+            }
+        }
+
+        
+        let mut flat_paths: Vec<String> = paths.into_iter().flatten().collect();
+        let borrowed_flat: Vec<&str> = flat_paths.iter().map(AsRef::as_ref).collect();
+        common_args.extend(borrowed_flat.iter().cloned());
+        //common_args.append(flat_paths.iter().map(AsRef::as_ref).collect());
+        //common_args.append(flat_paths.iter().map(AsRef::as_ref).collect());
+
+
+       // let mut final_args: Vec<&str> = Vec::new();
+
+       // for arg in common_args { final_args.push(arg); }
+       // for v in paths {
+       //     for path in v {
+       //         final_args.push(&path);
+       //     }
+       // }
+
+        //match moonsh_launch(common_args[0], common_args[1..].to_vec()) {
+        //    Ok(_) => {} // Nothing to see here
+        //    Err(e) => { // Exiting gracefully
+        //        break Err(e.to_string());
+        //    }
+        //}
+        match moonsh_launch(args[0], args[1..].to_vec()) {
+            Ok(_) => {}
+            Err(e) => {
+                break Err(e.to_string());
             }
         }
     }
@@ -124,9 +158,15 @@ fn main() {
     let prompt: &str = "> ";
     
     // loop
-    let code: i32 = moonsh_loop(prompt);
+    let code: Result<i32, String> = moonsh_loop(prompt);
 
     // clean up
-
-    process::exit(code)
+    match code {
+        Ok(code) => {
+            process::exit(code);
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
+    }
 }

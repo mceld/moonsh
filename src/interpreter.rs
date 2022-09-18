@@ -1,6 +1,7 @@
 use std::collections::HashSet;
-use regex::Regex;
 use std::path::Path;
+use regex::Regex;
+use walkdir::WalkDir;
 
 /**
  * Transition matrix defines tokenization scheme
@@ -193,6 +194,9 @@ pub fn build_regex(token_lists: Vec<Vec<Token>>) -> Vec<String> {
             match tok.kind {
 
                 TokenKind::Normal => {
+                    // TODO if its a regex special character - escape it...
+                    // does not apply to alphabetic characters
+                    // . + * ? ^ $ ( ) [ ] { } | \
                     re.push_str(&tok.value);
                 }
 
@@ -232,6 +236,59 @@ pub fn build_regex(token_lists: Vec<Vec<Token>>) -> Vec<String> {
         re_vec.push(re);
     }
     re_vec
+}
+
+pub fn valid_paths(re_vec: Vec<String>) -> Result<Vec<Vec<String>>, String> {
+    // vector containing vectors with all matching paths
+    let mut paths: Vec<Vec<String>> = Vec::new();
+    
+    for re_str in re_vec {
+        let mut matches: Vec<String> = Vec::new();
+        let mut prefix: &str = "./"; // current directory by default
+        match re_str.chars().nth(0) {
+            Some('/') => {
+                prefix = "";
+            }
+            _ => {}
+        }
+    
+        let combined_re = String::from(prefix) + &re_str;
+        let re: Regex;
+
+        match Regex::new(&combined_re) {
+            Err(e) => {
+                return Err(e.to_string());
+            }
+            Ok(regex) => {
+                re = regex;
+            }
+        }
+
+        let max_depth: usize = combined_re.matches('/').count();
+    
+        for entry in WalkDir::new(prefix).max_depth(max_depth) {
+            match entry {
+                Ok(entry) => {
+                    // if the entry's path matches re add it to a temp vec
+                    let path: String = entry.path().to_path_buf().into_os_string().into_string().unwrap();
+                    match re.is_match(&path) {
+                        true => {
+                            // TODO strip the prefix... for the result
+                            matches.push(path);
+                        }
+                        false => {}
+                    }
+                }
+                Err(e) => {
+                    return Err(e.to_string());
+                }
+            }
+        } 
+        // add the temp vec to the upper vec
+        paths.push(matches);
+
+    }
+    Ok(paths)
 }
 
 //fn match_combos(re_str: &str) -> Vec<&str> {
