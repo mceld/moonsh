@@ -34,269 +34,269 @@ use walkdir::WalkDir;
  *
  */
 const TM: [[Result<TokenKind, ParseError>; 5]; 6] = [
-    /* Outer lists are states, inner lists are character types given by get_kind */
-    // Normal
-    [
-        Ok(TokenKind::Normal),
-        Ok(TokenKind::Kleene),
-        Ok(TokenKind::Single),
-        Ok(TokenKind::GroupStart),
-        Err(ParseError::NoGroupStart),
-    ],
-    // Kleene
-    [
-        Ok(TokenKind::Normal),
-        Ok(TokenKind::Kleene),
-        Ok(TokenKind::Single),
-        Ok(TokenKind::GroupStart),
-        Err(ParseError::NoGroupStart),
-    ],
-    // Single
-    [
-        Ok(TokenKind::Normal),
-        Ok(TokenKind::Kleene),
-        Ok(TokenKind::Single),
-        Ok(TokenKind::GroupStart),
-        Err(ParseError::NoGroupStart),
-    ],
-    // GroupStart
-    [
-        Ok(TokenKind::Group),
-        Ok(TokenKind::Group),
-        Ok(TokenKind::Group),
-        Err(ParseError::NoGroupNest),
-        Ok(TokenKind::GroupEnd),
-    ],
-    // GroupEnd
-    [
-        Ok(TokenKind::Normal),
-        Ok(TokenKind::Kleene),
-        Ok(TokenKind::Single),
-        Ok(TokenKind::GroupStart),
-        Err(ParseError::NoGroupStart),
-    ],
-    // Group
-    [
-        Ok(TokenKind::Group),
-        Ok(TokenKind::Group),
-        Ok(TokenKind::Group),
-        Ok(TokenKind::Group),
-        Ok(TokenKind::GroupEnd),
-    ],
+  /* Outer lists are states, inner lists are character types given by get_kind */
+  // Normal
+  [
+    Ok(TokenKind::Normal),
+    Ok(TokenKind::Kleene),
+    Ok(TokenKind::Single),
+    Ok(TokenKind::GroupStart),
+    Err(ParseError::NoGroupStart),
+  ],
+  // Kleene
+  [
+    Ok(TokenKind::Normal),
+    Ok(TokenKind::Kleene),
+    Ok(TokenKind::Single),
+    Ok(TokenKind::GroupStart),
+    Err(ParseError::NoGroupStart),
+  ],
+  // Single
+  [
+    Ok(TokenKind::Normal),
+    Ok(TokenKind::Kleene),
+    Ok(TokenKind::Single),
+    Ok(TokenKind::GroupStart),
+    Err(ParseError::NoGroupStart),
+  ],
+  // GroupStart
+  [
+    Ok(TokenKind::Group),
+    Ok(TokenKind::Group),
+    Ok(TokenKind::Group),
+    Err(ParseError::NoGroupNest),
+    Ok(TokenKind::GroupEnd),
+  ],
+  // GroupEnd
+  [
+    Ok(TokenKind::Normal),
+    Ok(TokenKind::Kleene),
+    Ok(TokenKind::Single),
+    Ok(TokenKind::GroupStart),
+    Err(ParseError::NoGroupStart),
+  ],
+  // Group
+  [
+    Ok(TokenKind::Group),
+    Ok(TokenKind::Group),
+    Ok(TokenKind::Group),
+    Ok(TokenKind::Group),
+    Ok(TokenKind::GroupEnd),
+  ],
 ];
 
 const ERR_MSGS: [&'static str; 3] = [
-    "No start to group ended with \"]\".", // NoGroupStart
-    "Cannot nest groups.", // NoGroupNest
-    "Group has no matching \"]\".", // GroupNotEnded
+  "No start to group ended with \"]\".", // NoGroupStart
+  "Cannot nest groups.", // NoGroupNest
+  "Group has no matching \"]\".", // GroupNotEnded
 ];
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 enum TokenKind {
-    Normal,
-    Kleene, // *
-    Single, // ?
-    GroupStart, // [
-    GroupEnd, // ]
-    Group,
-    // Pipe, // |
+  Normal,
+  Kleene, // *
+  Single, // ?
+  GroupStart, // [
+  GroupEnd, // ]
+  Group,
+  // Pipe, // |
 }
 
 #[derive(Copy, Clone)]
 enum ParseError {
-    NoGroupStart,
-    NoGroupNest,
-    GroupNotEnded,
+  NoGroupStart,
+  NoGroupNest,
+  GroupNotEnded,
 }
 
 #[derive(Debug)]
 pub struct Token {
-    kind: TokenKind,
-    value: String,
+  kind: TokenKind,
+  value: String,
 }
 
 impl ToString for Token {
-    fn to_string(&self) -> String {
-        self.value.to_string()
-    }
+  fn to_string(&self) -> String {
+    self.value.to_string()
+  }
 }
 
 fn get_kind(ch: char) -> TokenKind {
-    match ch {
-        '*' => { TokenKind::Kleene }
-        '?' => { TokenKind::Single }
-        '[' => { TokenKind::GroupStart }
-        ']' => { TokenKind::GroupEnd }
-        _ => { TokenKind::Normal }
-    }
+  match ch {
+    '*' => { TokenKind::Kleene }
+    '?' => { TokenKind::Single }
+    '[' => { TokenKind::GroupStart }
+    ']' => { TokenKind::GroupEnd }
+    _ => { TokenKind::Normal }
+  }
 }
 
 pub fn parse_arg(arg: &str) -> Result<Vec<Token>, &'static str> {
-    let mut tokens: Vec<Token> = Vec::<Token>::new();
-    let mut token_buf: String = String::new();
-    let mut curr: TokenKind = TokenKind::Normal;
-    let length: usize = arg.len();
-    let arg_vec: Vec<char> = arg.chars().collect();
+  let mut tokens: Vec<Token> = Vec::<Token>::new();
+  let mut token_buf: String = String::new();
+  let mut curr: TokenKind = TokenKind::Normal;
+  let length: usize = arg.len();
+  let arg_vec: Vec<char> = arg.chars().collect();
 
-    for ch in 0..length {
-        let next: TokenKind = get_kind(arg_vec[ch]);
-        let transition = &TM[curr as usize][next as usize]; // Transition based on current and next
+  for ch in 0..length {
+    let next: TokenKind = get_kind(arg_vec[ch]);
+    let transition = &TM[curr as usize][next as usize]; // Transition based on current and next
 
-        match transition {
-            Err(err) => {
-                return Err(ERR_MSGS[*err as usize]);
-            }
-            Ok(val) => {
-                // If the token type is changing
-                if curr != *val {
-                    // Create a token with the current token type and buffer and add it to 'tokens'
-                    tokens.push(Token { kind: curr, value: token_buf.clone() });
-                    token_buf = "".to_string(); // Reset the buffer
-                    curr = *val;
-                }
-                // Add to continue the previous token or start a new one
-                token_buf.push(arg_vec[ch]);
-            }
+    match transition {
+      Err(err) => {
+        return Err(ERR_MSGS[*err as usize]);
+      }
+      Ok(val) => {
+        // If the token type is changing
+        if curr != *val {
+          // Create a token with the current token type and buffer and add it to 'tokens'
+          tokens.push(Token { kind: curr, value: token_buf.clone() });
+          token_buf = "".to_string(); // Reset the buffer
+          curr = *val;
         }
-        
-        // If ending on a Group state - return an Error
-        if ch == (length - 1) {
-            match transition {
-                Ok(val) => {
-                    match val {
-                        TokenKind::GroupStart | TokenKind::Group => {
-                            return Err(ERR_MSGS[ParseError::GroupNotEnded as usize]);
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {} // Errors should be filtered by the match above
-            }
-        }
+        // Add to continue the previous token or start a new one
+        token_buf.push(arg_vec[ch]);
+      }
     }
+    
+    // If ending on a Group state - return an Error
+    if ch == (length - 1) {
+      match transition {
+        Ok(val) => {
+          match val {
+            TokenKind::GroupStart | TokenKind::Group => {
+              return Err(ERR_MSGS[ParseError::GroupNotEnded as usize]);
+            }
+            _ => {}
+          }
+        }
+        _ => {} // Errors should be filtered by the match above
+      }
+    }
+  }
 
-    tokens.push(Token { kind: curr, value: token_buf.clone() });
+  tokens.push(Token { kind: curr, value: token_buf.clone() });
 
-    Ok(tokens)
+  Ok(tokens)
 }
 
 pub fn build_regex(token_lists: Vec<Vec<Token>>) -> Vec<String> {
-    let mut re_vec: Vec<String> = Vec::new();
+  let mut re_vec: Vec<String> = Vec::new();
 
-    // list of list of tokens
-    for list in token_lists {
+  // list of list of tokens
+  for list in token_lists {
 
-        // build a regex out of the list of tokens
-        let mut re: String = String::new();
+    // build a regex out of the list of tokens
+    let mut re: String = String::new();
 
-        for tok in list {
+    for tok in list {
 
-            match tok.kind {
+      match tok.kind {
 
-                TokenKind::Normal => {
-                    // TODO if its a regex special character - escape it...
-                    // does not apply to alphabetic characters
-                    // . + * ? ^ $ ( ) [ ] { } | \
-                    re.push_str(&tok.value);
-                }
-
-                TokenKind::Kleene => {
-                    re.push_str(".*");
-                }
-
-                TokenKind::Single => {
-                    re.push_str(".");
-                }
-
-                TokenKind::Group => {
-                    let char_vec: Vec<char> = tok.value.chars().collect();
-                    let mut char_set: HashSet<char> = HashSet::new();
-
-                    for item in char_vec {
-                        char_set.insert(item);
-                    }
-
-                    let set_size: usize = char_set.len();
-                    let mut iter: usize = 0;
-
-                    re.push_str("(");
-                    for ch in char_set {
-                        iter += 1;
-                        re.push(ch); // push a char
-                        if iter != set_size {
-                            re.push_str("|");
-                        }
-                    }
-                    re.push_str(")");
-                }
-
-                _ => {} // GroupStart + GroupEnd can be skipped
-            }
+        TokenKind::Normal => {
+          // TODO if its a regex special character - escape it...
+          // does not apply to alphabetic characters
+          // . + * ? ^ $ ( ) [ ] { } | \
+          re.push_str(&tok.value);
         }
-        re_vec.push(re);
+
+        TokenKind::Kleene => {
+          re.push_str(".*");
+        }
+
+        TokenKind::Single => {
+          re.push_str(".");
+        }
+
+        TokenKind::Group => {
+          let char_vec: Vec<char> = tok.value.chars().collect();
+          let mut char_set: HashSet<char> = HashSet::new();
+
+          for item in char_vec {
+            char_set.insert(item);
+          }
+
+          let set_size: usize = char_set.len();
+          let mut iter: usize = 0;
+
+          re.push_str("(");
+          for ch in char_set {
+            iter += 1;
+            re.push(ch); // push a char
+            if iter != set_size {
+              re.push_str("|");
+            }
+          }
+          re.push_str(")");
+        }
+
+        _ => {} // GroupStart + GroupEnd can be skipped
+      }
     }
-    re_vec
+    re_vec.push(re);
+  }
+  re_vec
 }
 
 pub fn valid_paths(re_vec: Vec<String>) -> Result<Vec<Vec<String>>, String> {
-    // vector containing vectors with all matching paths
-    let mut paths: Vec<Vec<String>> = Vec::new();
-    
-    for re_str in re_vec {
-        let mut matches: Vec<String> = Vec::new();
-        let mut prefix: &str = "./"; // current directory by default
-        match re_str.chars().nth(0) {
-            Some('/') => {
-                prefix = "";
-            }
-            _ => {}
-        }
-    
-        let combined_re = String::from(prefix) + &re_str;
-        let re: Regex;
-
-        match Regex::new(&combined_re) {
-            Err(e) => {
-                return Err(e.to_string());
-            }
-            Ok(regex) => {
-                re = regex;
-            }
-        }
-
-        let max_depth: usize = combined_re.matches('/').count();
-    
-        for entry in WalkDir::new(prefix).max_depth(max_depth) {
-            match entry {
-                Ok(entry) => {
-                    // if the entry's path matches re add it to a temp vec
-                    let path: String = entry.path().to_path_buf().into_os_string().into_string().unwrap();
-                    match re.is_match(&path) {
-                        true => {
-                            // TODO strip the prefix... for the result
-                            matches.push(path);
-                        }
-                        false => {}
-                    }
-                }
-                Err(e) => {
-                    return Err(e.to_string());
-                }
-            }
-        } 
-        // add the temp vec to the upper vec
-        paths.push(matches);
-
+  // vector containing vectors with all matching paths
+  let mut paths: Vec<Vec<String>> = Vec::new();
+  
+  for re_str in re_vec {
+    let mut matches: Vec<String> = Vec::new();
+    let mut prefix: &str = "./"; // current directory by default
+    match re_str.chars().nth(0) {
+      Some('/') => {
+        prefix = "";
+      }
+      _ => {}
     }
-    Ok(paths)
+  
+    let combined_re = String::from(prefix) + &re_str;
+    let re: Regex;
+
+    match Regex::new(&combined_re) {
+      Err(e) => {
+        return Err(e.to_string());
+      }
+      Ok(regex) => {
+        re = regex;
+      }
+    }
+
+    let max_depth: usize = combined_re.matches('/').count();
+  
+    for entry in WalkDir::new(prefix).max_depth(max_depth) {
+      match entry {
+        Ok(entry) => {
+          // if the entry's path matches re add it to a temp vec
+          let path: String = entry.path().to_path_buf().into_os_string().into_string().unwrap();
+          match re.is_match(&path) {
+            true => {
+              // TODO strip the prefix... for the result
+              matches.push(path);
+            }
+            false => {}
+          }
+        }
+        Err(e) => {
+          return Err(e.to_string());
+        }
+      }
+    } 
+    // add the temp vec to the upper vec
+    paths.push(matches);
+
+  }
+  Ok(paths)
 }
 
 //fn match_combos(re_str: &str) -> Vec<&str> {
-//    let re: Regex = Regex::new(re_str).unwrap();
+//  let re: Regex = Regex::new(re_str).unwrap();
 //
-//    // List all files that match regex ? how should this be done?
-//    // Should the tokenizer split up path tokens and add them to the path that should be listed and
-//    // searched for regex matches?
+//  // List all files that match regex ? how should this be done?
+//  // Should the tokenizer split up path tokens and add them to the path that should be listed and
+//  // searched for regex matches?
 //
 //}
 
